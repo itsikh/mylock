@@ -291,6 +291,29 @@ class SettingsViewModel @Inject constructor(
     val hasCredentials: Boolean get() = ttlockRepository.hasCredentials()
     val selectedLockName: String? get() = ttlockRepository.getSelectedLockName()
 
+    sealed class CredentialSaveState {
+        object Idle : CredentialSaveState()
+        object Validating : CredentialSaveState()
+        data class Error(val message: String) : CredentialSaveState()
+    }
+
+    private val _credentialSaveState = MutableStateFlow<CredentialSaveState>(CredentialSaveState.Idle)
+    val credentialSaveState: StateFlow<CredentialSaveState> = _credentialSaveState
+
+    fun saveTtlockCredentials(username: String, password: String) {
+        viewModelScope.launch {
+            _credentialSaveState.value = CredentialSaveState.Validating
+            when (val r = ttlockRepository.validateAndSaveCredentials(username, password)) {
+                is TtlockResult.Success -> _credentialSaveState.value = CredentialSaveState.Idle
+                is TtlockResult.Error -> _credentialSaveState.value = CredentialSaveState.Error(r.message)
+            }
+        }
+    }
+
+    fun resetCredentialSaveState() {
+        _credentialSaveState.value = CredentialSaveState.Idle
+    }
+
     sealed class LockListState {
         object Idle : LockListState()
         object Loading : LockListState()
@@ -300,11 +323,6 @@ class SettingsViewModel @Inject constructor(
 
     private val _lockListState = MutableStateFlow<LockListState>(LockListState.Idle)
     val lockListState: StateFlow<LockListState> = _lockListState
-
-    fun saveTtlockCredentials(username: String, password: String) {
-        ttlockRepository.saveCredentials(username, password)
-        AppLogger.i(TAG, "TTLock credentials saved")
-    }
 
     fun loadLocks() {
         viewModelScope.launch {

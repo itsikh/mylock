@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,7 +113,8 @@ fun SettingsScreen(
     val updateState     by viewModel.updateState.collectAsState()
     val exportState     by viewModel.exportState.collectAsState()
     val restoreState    by viewModel.restoreState.collectAsState()
-    val lockListState   by viewModel.lockListState.collectAsState()
+    val lockListState        by viewModel.lockListState.collectAsState()
+    val credentialSaveState  by viewModel.credentialSaveState.collectAsState()
 
     // SAF launchers — CreateDocument shows all providers including Google Drive
     val exportLauncher = rememberLauncherForActivityResult(
@@ -137,6 +139,18 @@ fun SettingsScreen(
     var ttlockPasswordVisible by remember { mutableStateOf(false) }
     var hasCreds              by remember { mutableStateOf(viewModel.hasCredentials) }
     var selectedLockName      by remember { mutableStateOf(viewModel.selectedLockName) }
+
+    // Clear form and refresh hasCreds after a successful credential save
+    LaunchedEffect(credentialSaveState) {
+        if (credentialSaveState is SettingsViewModel.CredentialSaveState.Idle) {
+            val nowHasCreds = viewModel.hasCredentials
+            if (nowHasCreds && !hasCreds) {
+                hasCreds = true
+                ttlockUsername = ""
+                ttlockPassword = ""
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -233,16 +247,36 @@ fun SettingsScreen(
                                 }
                             }
                         )
+                        val isValidating = credentialSaveState is SettingsViewModel.CredentialSaveState.Validating
                         Button(
                             onClick = {
                                 viewModel.saveTtlockCredentials(ttlockUsername.trim(), ttlockPassword)
-                                hasCreds = viewModel.hasCredentials
-                                ttlockUsername = ""
-                                ttlockPassword = ""
                             },
-                            enabled = ttlockUsername.isNotBlank() && ttlockPassword.isNotBlank(),
+                            enabled = ttlockUsername.isNotBlank() && ttlockPassword.isNotBlank() && !isValidating,
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Save Credentials") }
+                        ) {
+                            if (isValidating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Verifying…")
+                            } else {
+                                Text("Save Credentials")
+                            }
+                        }
+                        if (credentialSaveState is SettingsViewModel.CredentialSaveState.Error) {
+                            Text(
+                                (credentialSaveState as SettingsViewModel.CredentialSaveState.Error).message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            TextButton(onClick = { viewModel.resetCredentialSaveState() }) {
+                                Text("Dismiss")
+                            }
+                        }
 
                         // Lock selection
                         if (hasCreds) {
