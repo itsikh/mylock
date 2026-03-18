@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyLock</string>
+
+    <!-- Widget -->
+    <string name="widget_description">MyLock home-screen widget to unlock your door</string>
+    <string name="widget_tap_to_unlock">Tap to unlock</string>
+    <string name="widget_too_far">Get closer to unlock</string>
+    <string name="lock_icon_desc">Lock icon</string>
+    <string name="unlock">Unlock</string>
+
+    <!-- Home screen -->
+    <string name="lock_status_locked">Locked</string>
+    <string name="lock_status_unlocked">Unlocked</string>
+    <string name="lock_status_unknown">Unknown</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="no_activity">No recent activity</string>
+    <string name="setup_required">Setup required — configure your lock in Settings</string>
+
+    <!-- Settings -->
+    <string name="ttlock_credentials">TTLock Account</string>
+    <string name="ttlock_username">TTLock username (email)</string>
+    <string name="ttlock_password">TTLock password</string>
+    <string name="select_lock">Select Lock</string>
+    <string name="home_location">Home Location</string>
+    <string name="set_home_location">Set Current Location as Home</string>
+    <string name="location_saved">Home location saved</string>
 </resources>

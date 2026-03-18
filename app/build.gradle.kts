@@ -13,11 +13,11 @@ val keystoreProperties = java.util.Properties().apply {
 }
 
 android {
-    namespace = "com.template.app"
+    namespace = "com.mylock.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.template.app"
+        applicationId = "com.mylock.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -111,4 +111,7 @@ dependencies {
 
     // Gson
     implementation(libs.gson)
+
+    // Location / Geofencing
+    implementation(libs.play.services.location)
 }

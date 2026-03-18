@@ -16,6 +16,7 @@ datastore = "1.1.1"
 securityCrypto = "1.1.0-alpha06"
 biometric = "1.1.0"
 gson = "2.10.1"
+playServicesLocation = "21.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -63,6 +64,9 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 
 # Gson
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+
+# Location / Geofencing
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
