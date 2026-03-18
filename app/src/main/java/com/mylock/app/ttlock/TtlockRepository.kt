@@ -34,6 +34,24 @@ class TtlockRepository @Inject constructor(
         secureKeyManager.saveKey(KEY_PASSWORD, password)
     }
 
+    /** Attempts login with the supplied credentials. Saves them (and the token) only on success. */
+    suspend fun validateAndSaveCredentials(username: String, password: String): TtlockResult<Unit> =
+        withContext(Dispatchers.IO) {
+            when (val r = client.login(username, password)) {
+                is TtlockResult.Success -> {
+                    if (r.data.errcode != 0) {
+                        TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                    } else {
+                        saveCredentials(username, password)
+                        saveToken(r.data)
+                        AppLogger.i(TAG, "Credentials validated and saved for $username")
+                        TtlockResult.Success(Unit)
+                    }
+                }
+                is TtlockResult.Error -> r
+            }
+        }
+
     fun hasCredentials(): Boolean =
         secureKeyManager.hasKey(KEY_USERNAME) && secureKeyManager.hasKey(KEY_PASSWORD)
 
