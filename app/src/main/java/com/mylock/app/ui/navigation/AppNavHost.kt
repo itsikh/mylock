@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.mylock.app.bugreport.ScreenshotHolder
 import com.mylock.app.ui.components.DebugOverlayViewModel
 import com.mylock.app.ui.components.FloatingBugButton
+import com.mylock.app.ui.permission.LocationPermissionFlow
 import com.mylock.app.ui.screens.bugreport.BugReportScreen
 import com.mylock.app.ui.screens.bugreport.ReportMode
 import com.mylock.app.ui.screens.home.HomeScreen
@@ -54,6 +55,7 @@ fun AppNavHost() {
     val showBugButton by overlayVm.showBugButton.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
+        LocationPermissionFlow {
         NavHost(navController = navController, startDestination = "home") {
             composable("home") {
                 HomeScreen(
@@ -86,5 +88,6 @@ fun AppNavHost() {
                 navController.navigate("bug_report/BUG_REPORT")
             }
         )
+        } // end LocationPermissionFlow
     }
 }

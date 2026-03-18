@@ -92,13 +92,13 @@ object AppConfig {
      * TTLock developer client ID from https://euopen.ttlock.com/
      * Fill this in before building. Safe to bake into the APK (it's not a secret).
      */
-    const val TTLOCK_CLIENT_ID = "TODO_YOUR_CLIENT_ID"
+    const val TTLOCK_CLIENT_ID = "9c5fb400ea02452ba890826f3c67545d"
 
     /**
      * TTLock developer client secret. Also from the open platform dashboard.
      * This is hashed (MD5) before every API call, but still treat it with care.
      */
-    const val TTLOCK_CLIENT_SECRET = "TODO_YOUR_CLIENT_SECRET"
+    const val TTLOCK_CLIENT_SECRET = "76628a9fc3165c7b058493b25da0251b"
 
     // -----------------------------------------------------------------------------------------
     // Geofencing
