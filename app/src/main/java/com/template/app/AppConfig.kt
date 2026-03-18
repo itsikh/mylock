@@ -33,15 +33,14 @@ object AppConfig {
     // -----------------------------------------------------------------------------------------
 
     /** GitHub username or organization that owns the bug-report / issues repository. TODO: Change this. */
-    const val GITHUB_ISSUES_REPO_OWNER = "owner" // TODO: Set your GitHub username/org
+    const val GITHUB_ISSUES_REPO_OWNER = "itsikh"
 
     /**
      * GitHub repository name where bug report issues are created and screenshots are uploaded.
      * The GitHub token stored under [security.SecureKeyManager] key
      * [bugreport.GitHubIssuesClient.KEY_GITHUB_TOKEN] must have write access to this repo.
-     * TODO: Change this.
      */
-    const val GITHUB_ISSUES_REPO_NAME = "repo" // TODO: Set your issues repository name
+    const val GITHUB_ISSUES_REPO_NAME = "mylock"
 
     // -----------------------------------------------------------------------------------------
     // App Updates — GitHub repository where release APKs are published
@@ -49,16 +48,15 @@ object AppConfig {
     // Can be the same as the issues repo or a different one (e.g. a dedicated releases repo).
     // -----------------------------------------------------------------------------------------
 
-    /** GitHub username or organization that owns the releases repository. TODO: Change this. */
-    const val GITHUB_RELEASES_REPO_OWNER = "owner" // TODO: Set your GitHub username/org
+    /** GitHub username or organization that owns the releases repository. */
+    const val GITHUB_RELEASES_REPO_OWNER = "itsikh"
 
     /**
      * GitHub repository name where GitHub Releases with APK assets are published.
      * [update.AppUpdateManager] fetches the latest release tag from this repo and compares
      * it against the running [BuildConfig.VERSION_NAME] to decide if an update is available.
-     * TODO: Change this.
      */
-    const val GITHUB_RELEASES_REPO_NAME = "repo" // TODO: Set your releases repository name
+    const val GITHUB_RELEASES_REPO_NAME = "mylock"
 
     // -----------------------------------------------------------------------------------------
     // General
@@ -73,7 +71,7 @@ object AppConfig {
      * launcher icon label and window title.
      * TODO: Change this.
      */
-    const val APP_NAME = "TemplateApp" // TODO: Set your app name
+    const val APP_NAME = "MyLock"
 
     /**
      * Filename for the encrypted SharedPreferences file managed by [security.SecureKeyManager].
@@ -82,7 +80,7 @@ object AppConfig {
      * inaccessible, because the old encrypted file will not be found.
      * TODO: Rename to match your app.
      */
-    const val SECURE_PREFS_FILENAME = "template_secure_keys" // TODO: Rename
+    const val SECURE_PREFS_FILENAME = "mylock_secure_keys"
 
     // -----------------------------------------------------------------------------------------
     // Notifications
