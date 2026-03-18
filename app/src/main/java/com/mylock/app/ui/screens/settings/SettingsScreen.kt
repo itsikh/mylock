@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Visibility
@@ -111,6 +112,7 @@ fun SettingsScreen(
     val updateState     by viewModel.updateState.collectAsState()
     val exportState     by viewModel.exportState.collectAsState()
     val restoreState    by viewModel.restoreState.collectAsState()
+    val lockListState   by viewModel.lockListState.collectAsState()
 
     // SAF launchers — CreateDocument shows all providers including Google Drive
     val exportLauncher = rememberLauncherForActivityResult(
@@ -128,6 +130,13 @@ fun SettingsScreen(
     var showRestoreDialog     by remember { mutableStateOf(false) }
     var showClearLogsDialog   by remember { mutableStateOf(false) }
     var logsCleared           by remember { mutableStateOf(false) }
+
+    // TTLock local UI state
+    var ttlockUsername        by remember { mutableStateOf("") }
+    var ttlockPassword        by remember { mutableStateOf("") }
+    var ttlockPasswordVisible by remember { mutableStateOf(false) }
+    var hasCreds              by remember { mutableStateOf(viewModel.hasCredentials) }
+    var selectedLockName      by remember { mutableStateOf(viewModel.selectedLockName) }
 
     Scaffold(
         topBar = {
@@ -159,6 +168,149 @@ fun SettingsScreen(
                 onDetailedLoggingToggle = { viewModel.setDetailedLogging(it) },
                 onShowBugButtonToggle = { viewModel.setShowBugButton(it) }
             ) {
+
+                // ── TTLock Account ────────────────────────────────────────────
+                SectionHeader("TTLock Account")
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = if (!hasCreds || selectedLockName == null)
+                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    else
+                        CardDefaults.cardColors()
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Status row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                if (hasCreds && selectedLockName != null) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (hasCreds && selectedLockName != null) MaterialTheme.colorScheme.tertiary
+                                       else MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                when {
+                                    !hasCreds -> "TTLock credentials required"
+                                    selectedLockName == null -> "Credentials saved — select a lock below"
+                                    else -> "Lock: $selectedLockName"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (hasCreds && selectedLockName != null) MaterialTheme.colorScheme.tertiary
+                                        else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        // Credentials fields
+                        OutlinedTextField(
+                            value = ttlockUsername,
+                            onValueChange = { ttlockUsername = it },
+                            label = { Text("TTLock Username") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = ttlockPassword,
+                            onValueChange = { ttlockPassword = it },
+                            label = { Text("TTLock Password") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (ttlockPasswordVisible) VisualTransformation.None
+                                                   else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = {
+                                IconButton(onClick = { ttlockPasswordVisible = !ttlockPasswordVisible }) {
+                                    Icon(
+                                        if (ttlockPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = "Toggle visibility"
+                                    )
+                                }
+                            }
+                        )
+                        Button(
+                            onClick = {
+                                viewModel.saveTtlockCredentials(ttlockUsername.trim(), ttlockPassword)
+                                hasCreds = viewModel.hasCredentials
+                                ttlockUsername = ""
+                                ttlockPassword = ""
+                            },
+                            enabled = ttlockUsername.isNotBlank() && ttlockPassword.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Save Credentials") }
+
+                        // Lock selection
+                        if (hasCreds) {
+                            HorizontalDivider()
+                            Text("Select Lock", style = MaterialTheme.typography.labelLarge)
+
+                            when (val state = lockListState) {
+                                is SettingsViewModel.LockListState.Idle -> {
+                                    Button(
+                                        onClick = { viewModel.loadLocks() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.Lock, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Load My Locks")
+                                    }
+                                }
+                                is SettingsViewModel.LockListState.Loading -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        CircularProgressIndicator(Modifier.size(20.dp))
+                                        Text("Loading locks…")
+                                    }
+                                }
+                                is SettingsViewModel.LockListState.Loaded -> {
+                                    if (state.locks.isEmpty()) {
+                                        Text(
+                                            "No locks found on this account.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    } else {
+                                        state.locks.forEach { lock ->
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.selectLock(lock)
+                                                    selectedLockName = viewModel.selectedLockName
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(lock.lockAlias.ifEmpty { lock.lockName })
+                                            }
+                                        }
+                                    }
+                                    TextButton(
+                                        onClick = { viewModel.loadLocks() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Refresh") }
+                                }
+                                is SettingsViewModel.LockListState.Error -> {
+                                    Text(
+                                        state.message,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    TextButton(
+                                        onClick = { viewModel.loadLocks() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Retry") }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 // ── GitHub Token ──────────────────────────────────────────────
                 SectionHeader("GitHub Token")
