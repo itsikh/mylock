@@ -152,6 +152,6 @@ class DebugSettings @Inject constructor(
     }
 
     private fun defaultLogLevel(): LogLevel {
-        return if (com.template.app.BuildConfig.DEBUG) LogLevel.DEBUG else LogLevel.WARN
+        return if (com.mylock.app.BuildConfig.DEBUG) LogLevel.DEBUG else LogLevel.WARN
     }
 }

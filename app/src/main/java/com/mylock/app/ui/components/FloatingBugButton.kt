@@ -87,7 +87,7 @@ fun FloatingBugButton(
                         do {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            val delta = change.positionChange()
+                            val delta = change.position - change.previousPosition
                             totalX += abs(delta.x)
                             totalY += abs(delta.y)
                             if (totalX > 10f || totalY > 10f) {
