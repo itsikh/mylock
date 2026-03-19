@@ -25,14 +25,18 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -46,10 +50,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mylock.app.security.BiometricHelper
 import com.mylock.app.R
 import com.mylock.app.data.LockEvent
 import com.mylock.app.data.LockEventType
@@ -65,7 +72,9 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val events by viewModel.recentEvents.collectAsState()
+    val adminMode by viewModel.adminMode.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val activity = LocalContext.current as FragmentActivity
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -124,7 +133,25 @@ fun HomeScreen(
                         onClick = { viewModel.handleUnlockTap() }
                     )
 
-                    Spacer(Modifier.height(40.dp))
+                    Spacer(Modifier.height(32.dp))
+
+                    if (adminMode) {
+                        RemoteAccessSection(
+                            isLoading = state.isLoading,
+                            onRemoteUnlock = {
+                                BiometricHelper.authenticate(
+                                    activity = activity,
+                                    title = "Remote Unlock",
+                                    subtitle = "Authenticate to unlock from anywhere",
+                                    onSuccess = { viewModel.remoteUnlock() },
+                                    onError = { msg ->
+                                        viewModel.showError(msg)
+                                    }
+                                )
+                            }
+                        )
+                        Spacer(Modifier.height(24.dp))
+                    }
 
                     if (events.isNotEmpty()) {
                         Text(
@@ -245,6 +272,60 @@ private fun UnlockButton(
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteAccessSection(
+    isLoading: Boolean,
+    onRemoteUnlock: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.WifiTethering,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    "Remote Access",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Text(
+                "Unlock from anywhere — bypasses proximity check",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f))
+            OutlinedButton(
+                onClick = onRemoteUnlock,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Remote Unlock")
             }
         }
     }

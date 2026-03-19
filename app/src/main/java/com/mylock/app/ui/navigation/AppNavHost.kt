@@ -17,6 +17,7 @@ import com.mylock.app.ui.permission.LocationPermissionFlow
 import com.mylock.app.ui.screens.bugreport.BugReportScreen
 import com.mylock.app.ui.screens.bugreport.ReportMode
 import com.mylock.app.ui.screens.home.HomeScreen
+import com.mylock.app.ui.screens.portal.PortalWebViewScreen
 import com.mylock.app.ui.screens.settings.SettingsScreen
 
 /**
@@ -67,8 +68,12 @@ fun AppNavHost() {
                     onBack = { navController.popBackStack() },
                     onOpenBugReport = { mode ->
                         navController.navigate("bug_report/${mode.name}")
-                    }
+                    },
+                    onOpenPortal = { navController.navigate("portal") }
                 )
+            }
+            composable("portal") {
+                PortalWebViewScreen(onBack = { navController.popBackStack() })
             }
             composable("bug_report/{mode}") { backStackEntry ->
                 val modeName = backStackEntry.arguments?.getString("mode")
