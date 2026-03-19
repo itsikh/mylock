@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 1×1 mini widget — entire cell is the unlock button, no text -->
+<!-- 1×1 mini widget — root is the tap target for maximum launcher compatibility -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_mini_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:padding="12dp">
 
-    <ImageButton
+    <ImageView
         android:id="@+id/widget_mini_button"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:src="@android:drawable/ic_lock_lock"
-        android:tint="#FFFFFF"
-        android:background="@drawable/widget_background"
-        android:scaleType="centerInside"
-        android:padding="12dp"
         android:contentDescription="@string/unlock" />
 
 </FrameLayout>

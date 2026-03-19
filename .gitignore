@@ -35,3 +35,5 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+.autofix-logs/
+.kotlin/
