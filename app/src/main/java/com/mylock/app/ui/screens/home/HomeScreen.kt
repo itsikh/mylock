@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -120,7 +121,7 @@ fun HomeScreen(
                         isLoading = state.isLoading,
                         isNearHome = state.isNearHome,
                         lastActionSuccess = state.lastActionSuccess,
-                        onClick = { viewModel.unlock() }
+                        onClick = { viewModel.handleUnlockTap() }
                     )
 
                     Spacer(Modifier.height(40.dp))
@@ -215,7 +216,7 @@ private fun UnlockButton(
 
     Button(
         onClick = onClick,
-        enabled = isNearHome && !isLoading,
+        enabled = !isLoading,
         modifier = Modifier.size(140.dp),
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(containerColor = bgColor),
@@ -233,14 +234,14 @@ private fun UnlockButton(
                     imageVector = when (lastActionSuccess) {
                         true -> Icons.Default.Check
                         false -> Icons.Default.Close
-                        null -> Icons.Default.LockOpen
+                        null -> if (isNearHome) Icons.Default.LockOpen else Icons.Default.MyLocation
                     },
                     contentDescription = "Unlock",
                     modifier = Modifier.size(40.dp),
                     tint = Color.White
                 )
                 Text(
-                    text = if (!isNearHome) "Too far" else "Unlock",
+                    text = if (!isNearHome) "Check" else "Unlock",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge
                 )

@@ -41,15 +41,15 @@ class LockWidgetProvider : AppWidgetProvider() {
 
         val views = RemoteViews(context.packageName, R.layout.lock_widget)
 
-        // Status text
+        // Status text — always tappable; shows proximity hint
         views.setTextViewText(
             R.id.widget_status_text,
             if (isNearHome) context.getString(R.string.widget_tap_to_unlock)
-            else context.getString(R.string.widget_too_far)
+            else context.getString(R.string.widget_check_and_unlock)
         )
 
-        // Unlock button — enabled only when near home
-        views.setBoolean(R.id.widget_unlock_button, "setEnabled", isNearHome)
+        // Button always enabled — tap scans location if not near home
+        views.setBoolean(R.id.widget_unlock_button, "setEnabled", true)
 
         val unlockIntent = Intent(context, LockWidgetActionReceiver::class.java).apply {
             action = ACTION_WIDGET_UNLOCK

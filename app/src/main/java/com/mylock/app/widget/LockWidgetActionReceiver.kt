@@ -1,11 +1,18 @@
 package com.mylock.app.widget
 
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.location.Location
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.mylock.app.AppConfig
 import com.mylock.app.data.LockEvent
 import com.mylock.app.data.LockEventDao
 import com.mylock.app.data.LockEventType
+import com.mylock.app.geofence.GeofenceBroadcastReceiver
 import com.mylock.app.logging.AppLogger
 import com.mylock.app.ttlock.TtlockRepository
 import com.mylock.app.ttlock.TtlockResult
@@ -14,14 +21,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import javax.inject.Inject
 
 /**
  * Handles the widget Unlock tap.
- * Runs the TTLock API call on a background coroutine (no Activity context available).
- * Biometric auth is NOT enforced here since the widget is already on the secure lock screen
- * or requires device unlock to dismiss — that is sufficient for the home widget use-case.
- * For additional security, set requireBiometric = true in the future.
+ *
+ * If the geofence already marks the user as near home → unlock directly.
+ * Otherwise → scan current GPS, compare to saved home coordinates; if within
+ * [AppConfig.HOME_GEOFENCE_RADIUS_METERS] → mark near home and unlock; if still too far → skip.
  */
 @AndroidEntryPoint
 class LockWidgetActionReceiver : BroadcastReceiver() {
@@ -49,6 +58,23 @@ class LockWidgetActionReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         scope.launch {
             try {
+                val isNearHome = context
+                    .getSharedPreferences("geofence_state", Context.MODE_PRIVATE)
+                    .getBoolean(GeofenceBroadcastReceiver.PREF_IS_NEAR_HOME, false)
+
+                val confirmed = if (isNearHome) {
+                    AppLogger.i(TAG, "Already near home — skipping scan")
+                    true
+                } else {
+                    scanProximity(context)
+                }
+
+                if (!confirmed) {
+                    AppLogger.i(TAG, "Not near home after scan — unlock blocked")
+                    LockWidgetUpdater.update(context)
+                    return@launch
+                }
+
                 val result = ttlockRepository.unlock(lockId)
                 val eventType = when (result) {
                     is TtlockResult.Success -> {
@@ -72,6 +98,58 @@ class LockWidgetActionReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
+        }
+    }
+
+    /**
+     * Gets current GPS location and checks distance to saved home.
+     * If within radius, updates [GeofenceBroadcastReceiver.PREF_IS_NEAR_HOME] and returns true.
+     */
+    @SuppressLint("MissingPermission")
+    private suspend fun scanProximity(context: Context): Boolean {
+        return try {
+            val homePrefs = context.getSharedPreferences("home_location", Context.MODE_PRIVATE)
+            val homeLat = homePrefs.getFloat("lat", Float.MIN_VALUE)
+            val homeLng = homePrefs.getFloat("lng", Float.MIN_VALUE)
+            if (homeLat == Float.MIN_VALUE || homeLng == Float.MIN_VALUE) {
+                AppLogger.w(TAG, "scanProximity: no home location saved")
+                return false
+            }
+
+            AppLogger.i(TAG, "scanProximity: fetching GPS…")
+            val cts = CancellationTokenSource()
+            val location = suspendCancellableCoroutine<Location?> { cont ->
+                cont.invokeOnCancellation { cts.cancel() }
+                LocationServices.getFusedLocationProviderClient(context)
+                    .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                    .addOnSuccessListener { cont.resume(it) }
+                    .addOnFailureListener { cont.resume(null) }
+            }
+
+            if (location == null) {
+                AppLogger.w(TAG, "scanProximity: could not get location")
+                return false
+            }
+
+            val results = FloatArray(1)
+            Location.distanceBetween(
+                location.latitude, location.longitude,
+                homeLat.toDouble(), homeLng.toDouble(),
+                results
+            )
+            val distanceM = results[0]
+            AppLogger.i(TAG, "scanProximity: distance = ${distanceM.toInt()} m (radius ${AppConfig.HOME_GEOFENCE_RADIUS_METERS.toInt()} m)")
+
+            if (distanceM <= AppConfig.HOME_GEOFENCE_RADIUS_METERS) {
+                context.getSharedPreferences("geofence_state", Context.MODE_PRIVATE)
+                    .edit().putBoolean(GeofenceBroadcastReceiver.PREF_IS_NEAR_HOME, true).apply()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "scanProximity: exception: ${e.message}", e)
+            false
         }
     }
 }
