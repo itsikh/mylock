@@ -24,7 +24,9 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Visibility
@@ -115,6 +117,7 @@ fun SettingsScreen(
     val restoreState    by viewModel.restoreState.collectAsState()
     val lockListState        by viewModel.lockListState.collectAsState()
     val credentialSaveState  by viewModel.credentialSaveState.collectAsState()
+    val homeLocationState    by viewModel.homeLocationState.collectAsState()
 
     // SAF launchers — CreateDocument shows all providers including Google Drive
     val exportLauncher = rememberLauncherForActivityResult(
@@ -425,6 +428,87 @@ fun SettingsScreen(
                                     ) { Text("Retry") }
                                 }
                             }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // ── Home Location ─────────────────────────────────────────────
+                SectionHeader("Home Location")
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = if (homeLocationState is SettingsViewModel.HomeLocationState.Idle)
+                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    else
+                        CardDefaults.cardColors()
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                if (homeLocationState is SettingsViewModel.HomeLocationState.Set)
+                                    Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (homeLocationState is SettingsViewModel.HomeLocationState.Set)
+                                    MaterialTheme.colorScheme.tertiary
+                                else MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                when (val s = homeLocationState) {
+                                    is SettingsViewModel.HomeLocationState.Set ->
+                                        "Home set (%.5f, %.5f)".format(s.lat, s.lng)
+                                    else -> "No home location set — unlock button will stay disabled"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (homeLocationState is SettingsViewModel.HomeLocationState.Set)
+                                    MaterialTheme.colorScheme.tertiary
+                                else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Text(
+                            "Stand at your front door and tap the button to register your home geofence. The unlock button activates within ${com.mylock.app.AppConfig.HOME_GEOFENCE_RADIUS_METERS.toInt()} m of this point.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (homeLocationState is SettingsViewModel.HomeLocationState.Set)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        val isFetching = homeLocationState is SettingsViewModel.HomeLocationState.Fetching
+                        Button(
+                            onClick = { viewModel.setHomeFromCurrentLocation() },
+                            enabled = !isFetching,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isFetching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Getting location…")
+                            } else {
+                                Icon(Icons.Default.MyLocation, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (homeLocationState is SettingsViewModel.HomeLocationState.Set)
+                                        "Update Home Location" else "Set Current Location as Home"
+                                )
+                            }
+                        }
+                        if (homeLocationState is SettingsViewModel.HomeLocationState.Error) {
+                            Text(
+                                (homeLocationState as SettingsViewModel.HomeLocationState.Error).message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 }

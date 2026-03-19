@@ -1,12 +1,17 @@
 package com.mylock.app.ui.screens.settings
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.mylock.app.bugreport.GitHubIssuesClient
+import com.mylock.app.geofence.GeofenceBroadcastReceiver
 import com.mylock.app.geofence.GeofenceManager
 import com.mylock.app.logging.AppLogger
 import com.mylock.app.logging.DebugSettings
@@ -24,6 +29,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import javax.inject.Inject
 
 /**
@@ -346,6 +353,66 @@ class SettingsViewModel @Inject constructor(
         ttlockRepository.saveSelectedLock(lock.lockId, lock.lockAlias.ifEmpty { lock.lockName })
         _lockListState.value = LockListState.Idle
         AppLogger.i(TAG, "Selected lock: ${lock.lockAlias} (${lock.lockId})")
+    }
+
+    // ── Home Location ─────────────────────────────────────────────────────────
+
+    sealed class HomeLocationState {
+        object Idle : HomeLocationState()
+        object Fetching : HomeLocationState()
+        data class Set(val lat: Double, val lng: Double) : HomeLocationState()
+        data class Error(val message: String) : HomeLocationState()
+    }
+
+    private fun loadedHomeLocationState(): HomeLocationState {
+        val prefs = context.getSharedPreferences("home_location", Context.MODE_PRIVATE)
+        val lat = prefs.getFloat("lat", Float.MIN_VALUE)
+        val lng = prefs.getFloat("lng", Float.MIN_VALUE)
+        return if (lat != Float.MIN_VALUE && lng != Float.MIN_VALUE)
+            HomeLocationState.Set(lat.toDouble(), lng.toDouble())
+        else HomeLocationState.Idle
+    }
+
+    private val _homeLocationState = MutableStateFlow(loadedHomeLocationState())
+    val homeLocationState: StateFlow<HomeLocationState> = _homeLocationState
+
+    @SuppressLint("MissingPermission")
+    fun setHomeFromCurrentLocation() {
+        viewModelScope.launch {
+            _homeLocationState.value = HomeLocationState.Fetching
+            try {
+                val client = LocationServices.getFusedLocationProviderClient(context)
+                val cts = CancellationTokenSource()
+                val location = suspendCancellableCoroutine { cont ->
+                    cont.invokeOnCancellation { cts.cancel() }
+                    client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                        .addOnSuccessListener { cont.resume(it) }
+                        .addOnFailureListener { cont.resume(null) }
+                }
+                if (location != null) {
+                    val lat = location.latitude
+                    val lng = location.longitude
+                    geofenceManager.registerHomeGeofence(lat, lng)
+                    // Persist lat/lng so we can display it on next launch
+                    context.getSharedPreferences("home_location", Context.MODE_PRIVATE)
+                        .edit().putFloat("lat", lat.toFloat()).putFloat("lng", lng.toFloat()).apply()
+                    // User is physically at home right now — unlock immediately
+                    context.getSharedPreferences("geofence_state", Context.MODE_PRIVATE)
+                        .edit().putBoolean(GeofenceBroadcastReceiver.PREF_IS_NEAR_HOME, true).apply()
+                    AppLogger.i(TAG, "Home location set to $lat,$lng")
+                    _homeLocationState.value = HomeLocationState.Set(lat, lng)
+                } else {
+                    _homeLocationState.value = HomeLocationState.Error(
+                        "Could not get location. Enable GPS and try again."
+                    )
+                }
+            } catch (e: SecurityException) {
+                _homeLocationState.value = HomeLocationState.Error("Location permission required")
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "setHomeFromCurrentLocation failed", e)
+                _homeLocationState.value = HomeLocationState.Error(e.message ?: "Unknown error")
+            }
+        }
     }
 
     fun setHomeLocation(lat: Double, lng: Double) {
