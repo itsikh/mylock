@@ -61,6 +61,18 @@
                 android:resource="@xml/lock_widget_info" />
         </receiver>
 
+        <!-- ── 1×1 mini widget ─────────────────────────────────────────────── -->
+        <receiver
+            android:name=".widget.LockWidgetMiniProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lock_widget_mini_info" />
+        </receiver>
+
         <!-- ── Widget unlock action ───────────────────────────────────────── -->
         <receiver
             android:name=".widget.LockWidgetActionReceiver"

@@ -4,6 +4,7 @@
 
     <!-- Widget -->
     <string name="widget_description">MyLock home-screen widget to unlock your door</string>
+    <string name="widget_mini_description">MyLock 1×1 quick-unlock button</string>
     <string name="widget_tap_to_unlock">Tap to unlock</string>
     <string name="widget_too_far">Get closer to unlock</string>
     <string name="widget_check_and_unlock">Tap to check &amp; unlock</string>
