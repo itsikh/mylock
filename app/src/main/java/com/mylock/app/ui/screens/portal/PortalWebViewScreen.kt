@@ -130,7 +130,7 @@ fun PortalWebViewScreen(
                             }
                         }
 
-                        loadUrl("https://euopen.ttlock.com")
+                        loadUrl("https://euopen.ttlock.com/login")
                     }
                 }
             )
