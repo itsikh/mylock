@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import com.mylock.app.bugreport.CrashAutoReporter
 import com.mylock.app.ui.navigation.AppNavHost
+import com.mylock.app.widget.LockWidgetUpdater
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -109,5 +110,7 @@ class MainActivity : FragmentActivity() {
             }
         }
         lifecycleScope.launch { crashAutoReporter.checkAndReport() }
+        // Refresh widgets so they always reflect the latest enabled/disabled state
+        LockWidgetUpdater.update(this)
     }
 }
