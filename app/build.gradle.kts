@@ -14,6 +14,12 @@ val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) load(keystorePropertiesFile.inputStream())
 }
 
+// Read TTLock developer credentials from local.properties (never committed to git)
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+
 android {
     namespace = "com.mylock.app"
     compileSdk = 35
@@ -24,6 +30,12 @@ android {
         targetSdk = 35
         versionCode = 7
         versionName = "0.0.7"
+
+        // Inject TTLock credentials as BuildConfig fields — values come from local.properties
+        buildConfigField("String", "TTLOCK_CLIENT_ID",
+            "\"${localProperties.getProperty("ttlock.client.id", "")}\"")
+        buildConfigField("String", "TTLOCK_CLIENT_SECRET",
+            "\"${localProperties.getProperty("ttlock.client.secret", "")}\"")
     }
 
     signingConfigs {
