@@ -6,6 +6,7 @@ import com.mylock.app.logging.DebugSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -24,8 +25,14 @@ class DebugOverlayViewModel @Inject constructor(
     debugSettings: DebugSettings
 ) : ViewModel() {
 
-    /** Whether the floating bug-report button should be shown on top of all screens. */
-    val showBugButton: StateFlow<Boolean> = debugSettings.showBugButton.stateIn(
+    /**
+     * Whether the floating bug-report button should be shown on top of all screens.
+     * Requires both admin mode AND the "show bug button" setting to be enabled.
+     */
+    val showBugButton: StateFlow<Boolean> = combine(
+        debugSettings.adminMode,
+        debugSettings.showBugButton
+    ) { isAdmin, showButton -> isAdmin && showButton }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = false
