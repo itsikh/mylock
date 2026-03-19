@@ -129,14 +129,23 @@ class HomeViewModel @Inject constructor(
                     return@launch
                 }
 
-                AppLogger.i(TAG, "scanAndUnlock: fetching current location…")
-                val cts = CancellationTokenSource()
-                val location = suspendCancellableCoroutine<Location?> { cont ->
-                    cont.invokeOnCancellation { cts.cancel() }
-                    LocationServices.getFusedLocationProviderClient(context)
-                        .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                // Use cached lastLocation first (instant); only request fresh fix if cache empty
+                val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                AppLogger.i(TAG, "scanAndUnlock: trying lastLocation…")
+                val lastLoc = suspendCancellableCoroutine<Location?> { cont ->
+                    fusedClient.lastLocation
                         .addOnSuccessListener { cont.resume(it) }
                         .addOnFailureListener { cont.resume(null) }
+                }
+                val location = lastLoc ?: run {
+                    AppLogger.i(TAG, "scanAndUnlock: no cache, requesting fresh fix…")
+                    val cts = CancellationTokenSource()
+                    suspendCancellableCoroutine<Location?> { cont ->
+                        cont.invokeOnCancellation { cts.cancel() }
+                        fusedClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                            .addOnSuccessListener { cont.resume(it) }
+                            .addOnFailureListener { cont.resume(null) }
+                    }
                 }
 
                 if (location == null) {

@@ -102,7 +102,8 @@ class LockWidgetActionReceiver : BroadcastReceiver() {
     }
 
     /**
-     * Gets current GPS location and checks distance to saved home.
+     * Checks distance to saved home using the device's cached location first (instant),
+     * falling back to a fresh fix only if no cache is available.
      * If within radius, updates [GeofenceBroadcastReceiver.PREF_IS_NEAR_HOME] and returns true.
      */
     @SuppressLint("MissingPermission")
@@ -116,14 +117,26 @@ class LockWidgetActionReceiver : BroadcastReceiver() {
                 return false
             }
 
-            AppLogger.i(TAG, "scanProximity: fetching GPS…")
-            val cts = CancellationTokenSource()
-            val location = suspendCancellableCoroutine<Location?> { cont ->
-                cont.invokeOnCancellation { cts.cancel() }
-                LocationServices.getFusedLocationProviderClient(context)
-                    .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+            val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+
+            // Try cached lastLocation first — instant, no GPS spin-up needed
+            AppLogger.i(TAG, "scanProximity: trying lastLocation…")
+            val lastLocation = suspendCancellableCoroutine<Location?> { cont ->
+                fusedClient.lastLocation
                     .addOnSuccessListener { cont.resume(it) }
                     .addOnFailureListener { cont.resume(null) }
+            }
+
+            // Fall back to a fresh fix only if cache is empty
+            val location = lastLocation ?: run {
+                AppLogger.i(TAG, "scanProximity: no cached location, requesting fresh fix…")
+                val cts = CancellationTokenSource()
+                suspendCancellableCoroutine<Location?> { cont ->
+                    cont.invokeOnCancellation { cts.cancel() }
+                    fusedClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                        .addOnSuccessListener { cont.resume(it) }
+                        .addOnFailureListener { cont.resume(null) }
+                }
             }
 
             if (location == null) {

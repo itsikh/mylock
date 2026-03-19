@@ -3,8 +3,8 @@ Release a new version of this app. Arguments: optional version string e.g. "1.2.
 ## Environment
 - JAVA_HOME: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
 - Gradle: `./gradlew` (wrapper in project)
-- Primary remote: `origin` → GitHub (releases + issues)
-- Secondary remote: `github` → push only if this remote exists
+- Primary remote: `origin` → Bitbucket
+- Secondary remote: `github` → GitHub (releases + issues). Push if this remote exists.
 
 ---
 
@@ -24,7 +24,7 @@ Find `AppConfig.kt` (search under `app/src/`) and extract:
 - `newVersionCode` = current `versionCode` + 1.
 
 ### 3. Pre-flight checks — abort if any fail
-Run these two checks **in parallel** (single Bash call with `&` and `wait`):
+Run both checks in parallel:
 ```bash
 { test -f keystore.properties && echo "✅ keystore" || { echo "❌ keystore.properties missing"; exit 1; }; } &
 { [ "$(git branch --show-current)" = "main" ] && echo "✅ branch=main" || { echo "❌ not on main"; exit 1; }; } &
@@ -32,15 +32,14 @@ wait
 ```
 
 ### 4. Commit any uncommitted changes
-Check for uncommitted tracked changes (`git status --porcelain`).
-If there are any modified tracked files (`M` lines), stage all and commit:
+Check `git status --porcelain`. If there are any changes (modified **or** new untracked files, excluding `??` paths covered by .gitignore), stage everything and commit:
 ```bash
-git add -u
+git add -A
 git commit -m "chore: pre-release changes for v<newVersionName>
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
-Untracked files (`??`) are ignored. If the tree is already clean, skip this step.
+If the tree is already clean (no output from `git status --porcelain`), skip this step.
 
 ### 5. Bump version in build.gradle.kts
 Edit `app/build.gradle.kts`:
@@ -52,17 +51,24 @@ Edit `app/build.gradle.kts`:
 git add app/build.gradle.kts && git commit -m "chore: release v<newVersionName>"
 ```
 
-### 7. Push source + start build in parallel
-Push to origin; also push to `github` remote if it exists:
+### 7. Push both remotes — auto-rebase if rejected — then build in parallel
+
+Define a push helper that auto-rebases on rejection (no manual intervention):
 ```bash
-git push origin main &
-git remote | grep -q '^github$' && git push github main &
+push_with_rebase() {
+    local remote=$1
+    git push "$remote" main 2>/dev/null && return 0
+    echo "⚠️  $remote push rejected — rebasing…"
+    git pull --rebase "$remote" main && git push "$remote" main
+}
+push_with_rebase origin &
+{ git remote | grep -q '^github$' && push_with_rebase github; } &
 wait
 ```
-If origin push fails, log the warning and continue. Then immediately start the build:
+
+Immediately after (don't wait for pushes to finish — start build in parallel with the push):
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-# Detect CPU count and available RAM to maximise build speed
 CPUS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 8)
 MEM_GB=$(python3 -c "
 import subprocess
@@ -74,22 +80,26 @@ print(max(4, m // 1024 // 1024 // 1024 - 2))
   --build-cache \
   --configuration-cache \
   --max-workers="$CPUS" \
-  -Dorg.gradle.jvmargs="-Xmx${MEM_GB}g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC" \
+  -Dorg.gradle.jvmargs="-Xmx${MEM_GB}g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC -XX:MaxMetaspaceSize=512m" \
   -Dkotlin.incremental=true \
-  -Dkotlin.daemon.jvm.options="-Xmx${MEM_GB}g"
+  -Dkotlin.daemon.jvm.options="-Xmx${MEM_GB}g" \
+  -Dfile.encoding=UTF-8
 ```
 If the build fails, stop and show the last 30 lines. Do NOT continue.
 
-### 8. Copy APK, create tag, push tag — all in parallel
-After the build succeeds:
+### 8. Copy APK, create tag, push tag to both remotes
 ```bash
 cp app/build/outputs/apk/release/app-release.apk <AppName>-v<newVersionName>.apk
 git tag v<newVersionName>
-git push origin v<newVersionName> &
-git remote | grep -q '^github$' && git push github v<newVersionName> &
+push_tag() {
+    local remote=$1
+    git push "$remote" "v<newVersionName>" 2>/dev/null || true
+}
+push_tag origin &
+{ git remote | grep -q '^github$' && push_tag github; } &
 wait
 ```
-Where `<AppName>` is the `APP_NAME` value from `AppConfig.kt` (spaces replaced with hyphens).
+Where `<AppName>` is `APP_NAME` from `AppConfig.kt` (spaces → hyphens).
 
 ### 9. Create GitHub release and upload APK
 ```bash
