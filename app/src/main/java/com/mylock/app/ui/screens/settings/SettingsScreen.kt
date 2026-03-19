@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestoreFromTrash
@@ -59,11 +60,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mylock.app.security.BiometricHelper
 import com.mylock.app.AppConfig
 import com.mylock.app.BuildConfig
 import com.mylock.app.ui.components.SectionHeader
@@ -105,9 +109,11 @@ import java.util.Locale
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenBugReport: (ReportMode) -> Unit,
+    onOpenPortal: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val adminMode       by viewModel.adminMode.collectAsState()
+    val activity        = LocalContext.current as FragmentActivity
     val logLevel        by viewModel.logLevel.collectAsState()
     val showBugButton   by viewModel.showBugButton.collectAsState()
     val autoUpdate      by viewModel.autoUpdateEnabled.collectAsState()
@@ -266,6 +272,26 @@ fun SettingsScreen(
                             enabled = devClientId.isNotBlank() && devClientSecret.isNotBlank(),
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Save Developer Credentials") }
+
+                        if (hasDevCreds && adminMode) {
+                            HorizontalDivider()
+                            OutlinedButton(
+                                onClick = {
+                                    BiometricHelper.authenticate(
+                                        activity = activity,
+                                        title = "API Usage Dashboard",
+                                        subtitle = "Authenticate to view developer portal",
+                                        onSuccess = onOpenPortal,
+                                        onError = { /* dismissed — stay on screen */ }
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.MonitorHeart, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("API Usage Dashboard")
+                            }
+                        }
                     }
                 }
 

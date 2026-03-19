@@ -14,6 +14,7 @@ import com.mylock.app.data.LockEventDao
 import com.mylock.app.data.LockEventType
 import com.mylock.app.geofence.GeofenceBroadcastReceiver
 import com.mylock.app.logging.AppLogger
+import com.mylock.app.logging.DebugSettings
 import com.mylock.app.ttlock.TtlockRepository
 import com.mylock.app.ttlock.TtlockResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -40,7 +41,8 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val ttlockRepository: TtlockRepository,
-    private val lockEventDao: LockEventDao
+    private val lockEventDao: LockEventDao,
+    private val debugSettings: DebugSettings
 ) : ViewModel() {
 
     companion object {
@@ -53,6 +55,9 @@ class HomeViewModel @Inject constructor(
     val recentEvents: StateFlow<List<LockEvent>> = lockEventDao
         .getRecentEvents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val adminMode: StateFlow<Boolean> = debugSettings.adminMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         refresh()
@@ -99,6 +104,33 @@ class HomeViewModel @Inject constructor(
                 }
                 is TtlockResult.Error -> {
                     AppLogger.e(TAG, "Unlock failed: ${result.message}")
+                    lockEventDao.insert(LockEvent(eventType = LockEventType.UNLOCK_FAILED, lockId = lockId, lockName = lockName, errorMessage = result.message))
+                    _uiState.value = _uiState.value.copy(isLoading = false, lastActionSuccess = false, errorMessage = result.message)
+                }
+            }
+        }
+    }
+
+    /**
+     * Unlocks the door from anywhere, bypassing the geofence proximity check.
+     * Only callable after a successful biometric authentication — enforced by the UI layer.
+     * Visible only when admin mode is active.
+     */
+    fun remoteUnlock() {
+        val lockId = ttlockRepository.getSelectedLockId() ?: return
+        val lockName = ttlockRepository.getSelectedLockName() ?: "Door"
+
+        viewModelScope.launch {
+            AppLogger.i(TAG, "remoteUnlock: initiating (admin, post-biometric)")
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            when (val result = ttlockRepository.unlock(lockId)) {
+                is TtlockResult.Success -> {
+                    AppLogger.i(TAG, "remoteUnlock: success")
+                    lockEventDao.insert(LockEvent(eventType = LockEventType.UNLOCK, lockId = lockId, lockName = lockName))
+                    _uiState.value = _uiState.value.copy(isLoading = false, lastActionSuccess = true)
+                }
+                is TtlockResult.Error -> {
+                    AppLogger.e(TAG, "remoteUnlock: failed: ${result.message}")
                     lockEventDao.insert(LockEvent(eventType = LockEventType.UNLOCK_FAILED, lockId = lockId, lockName = lockName, errorMessage = result.message))
                     _uiState.value = _uiState.value.copy(isLoading = false, lastActionSuccess = false, errorMessage = result.message)
                 }
@@ -201,5 +233,9 @@ class HomeViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null, lastActionSuccess = null)
+    }
+
+    fun showError(message: String) {
+        _uiState.value = _uiState.value.copy(errorMessage = message)
     }
 }
