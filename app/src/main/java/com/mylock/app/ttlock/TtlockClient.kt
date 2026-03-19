@@ -68,9 +68,9 @@ class TtlockClient(
         return try {
             val body = FormBody.Builder()
                 .add("client_id", clientId)
-                .add("client_secret", md5(clientSecret))
-                .add("username", username)
-                .add("password", md5(password))
+                .add("client_secret", clientSecret)   // NOT hashed — TTLock expects raw secret
+                .add("username", username)             // OkHttp encodes @ → %40 automatically
+                .add("password", md5(password))        // password IS MD5-hashed
                 .build()
             val request = Request.Builder().url("$url/oauth2/token").post(body).build()
             execute(request) { gson.fromJson(it, TtlockTokenResponse::class.java) }
@@ -88,7 +88,7 @@ class TtlockClient(
         return try {
             val body = FormBody.Builder()
                 .add("client_id", clientId)
-                .add("client_secret", md5(clientSecret))
+                .add("client_secret", clientSecret)    // NOT hashed
                 .add("grant_type", "refresh_token")
                 .add("refresh_token", refreshToken)
                 .build()
