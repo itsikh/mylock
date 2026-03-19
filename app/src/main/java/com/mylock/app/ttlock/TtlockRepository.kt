@@ -25,9 +25,36 @@ class TtlockRepository @Inject constructor(
         const val KEY_PASSWORD = "ttlock_password"
         const val KEY_SELECTED_LOCK_ID = "ttlock_selected_lock_id"
         const val KEY_SELECTED_LOCK_NAME = "ttlock_selected_lock_name"
+        const val KEY_CLIENT_ID = "ttlock_client_id"
+        const val KEY_CLIENT_SECRET = "ttlock_client_secret"
     }
 
-    // ── Credentials ──────────────────────────────────────────────────────────
+    init {
+        // Apply any previously saved developer credentials over the AppConfig defaults
+        val storedId = secureKeyManager.getKey(KEY_CLIENT_ID)
+        val storedSecret = secureKeyManager.getKey(KEY_CLIENT_SECRET)
+        if (storedId != null && storedSecret != null) {
+            client.clientId = storedId
+            client.clientSecret = storedSecret
+            AppLogger.i(TAG, "Loaded stored developer credentials (clientId=$storedId)")
+        }
+    }
+
+    // ── Developer credentials (client_id / client_secret) ────────────────────
+
+    fun hasClientCredentials(): Boolean =
+        secureKeyManager.hasKey(KEY_CLIENT_ID) && secureKeyManager.hasKey(KEY_CLIENT_SECRET)
+
+    fun saveClientCredentials(clientId: String, clientSecret: String) {
+        secureKeyManager.saveKey(KEY_CLIENT_ID, clientId)
+        secureKeyManager.saveKey(KEY_CLIENT_SECRET, clientSecret)
+        client.clientId = clientId
+        client.clientSecret = clientSecret
+        clearSession() // force re-login with new credentials
+        AppLogger.i(TAG, "Developer credentials updated (clientId=$clientId)")
+    }
+
+    // ── User credentials ──────────────────────────────────────────────────────
 
     fun saveCredentials(username: String, password: String) {
         secureKeyManager.saveKey(KEY_USERNAME, username)
@@ -43,7 +70,11 @@ class TtlockRepository @Inject constructor(
                     is TtlockResult.Success -> {
                         if (r.data.errcode != 0) {
                             AppLogger.e(TAG, "validateAndSaveCredentials: API error ${r.data.errcode}: ${r.data.errmsg}")
-                            TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                            val message = if (r.data.errcode == 10001)
+                                "Invalid app credentials (client ID / secret). Go to Settings → Developer Credentials and enter valid TTLock open-platform credentials."
+                            else
+                                r.data.errmsg
+                            TtlockResult.Error(r.data.errcode, message)
                         } else {
                             saveCredentials(username, password)
                             saveToken(r.data)

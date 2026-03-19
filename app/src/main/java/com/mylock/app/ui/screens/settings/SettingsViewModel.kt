@@ -286,7 +286,15 @@ class SettingsViewModel @Inject constructor(
         _restoreState.value = RestoreState.Idle
     }
 
-    // ── TTLock credentials ────────────────────────────────────────────────────
+    // ── TTLock developer credentials (client_id / client_secret) ─────────────
+
+    val hasClientCredentials: Boolean get() = ttlockRepository.hasClientCredentials()
+
+    fun saveClientCredentials(clientId: String, clientSecret: String) {
+        ttlockRepository.saveClientCredentials(clientId, clientSecret)
+    }
+
+    // ── TTLock user credentials ───────────────────────────────────────────────
 
     val hasCredentials: Boolean get() = ttlockRepository.hasCredentials()
     val selectedLockName: String? get() = ttlockRepository.getSelectedLockName()
