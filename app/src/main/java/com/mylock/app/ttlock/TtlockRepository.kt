@@ -37,18 +37,28 @@ class TtlockRepository @Inject constructor(
     /** Attempts login with the supplied credentials. Saves them (and the token) only on success. */
     suspend fun validateAndSaveCredentials(username: String, password: String): TtlockResult<Unit> =
         withContext(Dispatchers.IO) {
-            when (val r = client.login(username, password)) {
-                is TtlockResult.Success -> {
-                    if (r.data.errcode != 0) {
-                        TtlockResult.Error(r.data.errcode, r.data.errmsg)
-                    } else {
-                        saveCredentials(username, password)
-                        saveToken(r.data)
-                        AppLogger.i(TAG, "Credentials validated and saved for $username")
-                        TtlockResult.Success(Unit)
+            try {
+                AppLogger.i(TAG, "validateAndSaveCredentials: validating $username")
+                when (val r = client.login(username, password)) {
+                    is TtlockResult.Success -> {
+                        if (r.data.errcode != 0) {
+                            AppLogger.e(TAG, "validateAndSaveCredentials: API error ${r.data.errcode}: ${r.data.errmsg}")
+                            TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                        } else {
+                            saveCredentials(username, password)
+                            saveToken(r.data)
+                            AppLogger.i(TAG, "validateAndSaveCredentials: success for $username")
+                            TtlockResult.Success(Unit)
+                        }
+                    }
+                    is TtlockResult.Error -> {
+                        AppLogger.e(TAG, "validateAndSaveCredentials: error: ${r.message}")
+                        r
                     }
                 }
-                is TtlockResult.Error -> r
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "validateAndSaveCredentials: unexpected exception: ${e.message}", e)
+                TtlockResult.Error(-1, e.message ?: "Unknown error")
             }
         }
 
@@ -64,40 +74,67 @@ class TtlockRepository @Inject constructor(
     // ── Token management ─────────────────────────────────────────────────────
 
     suspend fun getValidAccessToken(): String? = withContext(Dispatchers.IO) {
-        val token = secureKeyManager.getKey(KEY_ACCESS_TOKEN) ?: return@withContext login()
-        val expiry = secureKeyManager.getKey(KEY_TOKEN_EXPIRY)?.toLongOrNull() ?: 0L
-        if (System.currentTimeMillis() < expiry - 60_000) return@withContext token
-        // Try refresh first, fall back to full login
-        val refreshToken = secureKeyManager.getKey(KEY_REFRESH_TOKEN)
-        if (refreshToken != null) {
-            when (val r = client.refreshToken(refreshToken)) {
-                is TtlockResult.Success -> {
-                    saveToken(r.data)
-                    return@withContext r.data.accessToken
-                }
-                is TtlockResult.Error -> AppLogger.w(TAG, "Refresh failed: ${r.message}")
+        try {
+            val token = secureKeyManager.getKey(KEY_ACCESS_TOKEN)
+            if (token == null) {
+                AppLogger.i(TAG, "getValidAccessToken: no cached token, logging in")
+                return@withContext login()
             }
+            val expiry = secureKeyManager.getKey(KEY_TOKEN_EXPIRY)?.toLongOrNull() ?: 0L
+            val remaining = expiry - System.currentTimeMillis()
+            if (remaining > 60_000) {
+                AppLogger.i(TAG, "getValidAccessToken: cached token valid (${remaining / 1000}s left)")
+                return@withContext token
+            }
+            AppLogger.i(TAG, "getValidAccessToken: token expired, attempting refresh")
+            val refreshToken = secureKeyManager.getKey(KEY_REFRESH_TOKEN)
+            if (refreshToken != null) {
+                when (val r = client.refreshToken(refreshToken)) {
+                    is TtlockResult.Success -> {
+                        AppLogger.i(TAG, "getValidAccessToken: refresh succeeded")
+                        saveToken(r.data)
+                        return@withContext r.data.accessToken
+                    }
+                    is TtlockResult.Error -> AppLogger.w(TAG, "getValidAccessToken: refresh failed (${r.message}), falling back to login")
+                }
+            } else {
+                AppLogger.w(TAG, "getValidAccessToken: no refresh token, falling back to login")
+            }
+            login()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "getValidAccessToken: unexpected exception: ${e.message}", e)
+            null
         }
-        login()
     }
 
     private suspend fun login(): String? {
-        val username = secureKeyManager.getKey(KEY_USERNAME) ?: return null
-        val password = secureKeyManager.getKey(KEY_PASSWORD) ?: return null
-        return when (val r = client.login(username, password)) {
-            is TtlockResult.Success -> {
-                if (r.data.errcode != 0) {
-                    AppLogger.e(TAG, "Login errcode ${r.data.errcode}: ${r.data.errmsg}")
+        return try {
+            val username = secureKeyManager.getKey(KEY_USERNAME)
+            val password = secureKeyManager.getKey(KEY_PASSWORD)
+            if (username == null || password == null) {
+                AppLogger.w(TAG, "login: no stored credentials")
+                return null
+            }
+            AppLogger.i(TAG, "login: attempting login for $username")
+            when (val r = client.login(username, password)) {
+                is TtlockResult.Success -> {
+                    if (r.data.errcode != 0) {
+                        AppLogger.e(TAG, "login: API error ${r.data.errcode}: ${r.data.errmsg}")
+                        null
+                    } else {
+                        AppLogger.i(TAG, "login: success, token expires in ${r.data.expiresIn}s")
+                        saveToken(r.data)
+                        r.data.accessToken
+                    }
+                }
+                is TtlockResult.Error -> {
+                    AppLogger.e(TAG, "login: request error: ${r.message}")
                     null
-                } else {
-                    saveToken(r.data)
-                    r.data.accessToken
                 }
             }
-            is TtlockResult.Error -> {
-                AppLogger.e(TAG, "Login failed: ${r.message}")
-                null
-            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "login: unexpected exception: ${e.message}", e)
+            null
         }
     }
 
@@ -124,40 +161,89 @@ class TtlockRepository @Inject constructor(
     // ── Lock operations ──────────────────────────────────────────────────────
 
     suspend fun getLocks(): TtlockResult<List<TtlockLock>> = withContext(Dispatchers.IO) {
-        val token = getValidAccessToken()
-            ?: return@withContext TtlockResult.Error(-1, "Not authenticated")
-        when (val r = client.getLocks(token)) {
-            is TtlockResult.Success -> {
-                if (r.data.errcode != 0)
-                    TtlockResult.Error(r.data.errcode, r.data.errmsg)
-                else
-                    TtlockResult.Success(r.data.list)
+        try {
+            AppLogger.i(TAG, "getLocks: fetching lock list")
+            val token = getValidAccessToken()
+            if (token == null) {
+                AppLogger.e(TAG, "getLocks: not authenticated")
+                return@withContext TtlockResult.Error(-1, "Not authenticated")
             }
-            is TtlockResult.Error -> r
+            when (val r = client.getLocks(token)) {
+                is TtlockResult.Success -> {
+                    if (r.data.errcode != 0) {
+                        AppLogger.e(TAG, "getLocks: API error ${r.data.errcode}: ${r.data.errmsg}")
+                        TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                    } else {
+                        AppLogger.i(TAG, "getLocks: got ${r.data.list.size} locks")
+                        TtlockResult.Success(r.data.list)
+                    }
+                }
+                is TtlockResult.Error -> {
+                    AppLogger.e(TAG, "getLocks: error: ${r.message}")
+                    r
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "getLocks: unexpected exception: ${e.message}", e)
+            TtlockResult.Error(-1, e.message ?: "Unknown error")
         }
     }
 
     suspend fun unlock(lockId: Long): TtlockResult<Unit> = withContext(Dispatchers.IO) {
-        val token = getValidAccessToken()
-            ?: return@withContext TtlockResult.Error(-1, "Not authenticated")
-        when (val r = client.unlock(token, lockId)) {
-            is TtlockResult.Success -> {
-                if (r.data.isSuccess) TtlockResult.Success(Unit)
-                else TtlockResult.Error(r.data.errcode, r.data.errmsg)
+        try {
+            AppLogger.i(TAG, "unlock: lockId=$lockId")
+            val token = getValidAccessToken()
+            if (token == null) {
+                AppLogger.e(TAG, "unlock: not authenticated")
+                return@withContext TtlockResult.Error(-1, "Not authenticated")
             }
-            is TtlockResult.Error -> r
+            when (val r = client.unlock(token, lockId)) {
+                is TtlockResult.Success -> {
+                    if (r.data.isSuccess) {
+                        AppLogger.i(TAG, "unlock: success")
+                        TtlockResult.Success(Unit)
+                    } else {
+                        AppLogger.e(TAG, "unlock: API error ${r.data.errcode}: ${r.data.errmsg}")
+                        TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                    }
+                }
+                is TtlockResult.Error -> {
+                    AppLogger.e(TAG, "unlock: error: ${r.message}")
+                    r
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "unlock: unexpected exception: ${e.message}", e)
+            TtlockResult.Error(-1, e.message ?: "Unknown error")
         }
     }
 
     suspend fun lock(lockId: Long): TtlockResult<Unit> = withContext(Dispatchers.IO) {
-        val token = getValidAccessToken()
-            ?: return@withContext TtlockResult.Error(-1, "Not authenticated")
-        when (val r = client.lock(token, lockId)) {
-            is TtlockResult.Success -> {
-                if (r.data.isSuccess) TtlockResult.Success(Unit)
-                else TtlockResult.Error(r.data.errcode, r.data.errmsg)
+        try {
+            AppLogger.i(TAG, "lock: lockId=$lockId")
+            val token = getValidAccessToken()
+            if (token == null) {
+                AppLogger.e(TAG, "lock: not authenticated")
+                return@withContext TtlockResult.Error(-1, "Not authenticated")
             }
-            is TtlockResult.Error -> r
+            when (val r = client.lock(token, lockId)) {
+                is TtlockResult.Success -> {
+                    if (r.data.isSuccess) {
+                        AppLogger.i(TAG, "lock: success")
+                        TtlockResult.Success(Unit)
+                    } else {
+                        AppLogger.e(TAG, "lock: API error ${r.data.errcode}: ${r.data.errmsg}")
+                        TtlockResult.Error(r.data.errcode, r.data.errmsg)
+                    }
+                }
+                is TtlockResult.Error -> {
+                    AppLogger.e(TAG, "lock: error: ${r.message}")
+                    r
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "lock: unexpected exception: ${e.message}", e)
+            TtlockResult.Error(-1, e.message ?: "Unknown error")
         }
     }
 }
