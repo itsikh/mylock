@@ -133,6 +133,12 @@ fun SettingsScreen(
     var showClearLogsDialog   by remember { mutableStateOf(false) }
     var logsCleared           by remember { mutableStateOf(false) }
 
+    // TTLock developer credential local UI state
+    var devClientId           by remember { mutableStateOf("") }
+    var devClientSecret       by remember { mutableStateOf("") }
+    var devSecretVisible      by remember { mutableStateOf(false) }
+    var hasDevCreds           by remember { mutableStateOf(viewModel.hasClientCredentials) }
+
     // TTLock local UI state
     var ttlockUsername        by remember { mutableStateOf("") }
     var ttlockPassword        by remember { mutableStateOf("") }
@@ -182,6 +188,85 @@ fun SettingsScreen(
                 onDetailedLoggingToggle = { viewModel.setDetailedLogging(it) },
                 onShowBugButtonToggle = { viewModel.setShowBugButton(it) }
             ) {
+
+                // ── TTLock Developer Credentials ──────────────────────────────
+                SectionHeader("TTLock Developer Credentials")
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = if (!hasDevCreds)
+                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    else
+                        CardDefaults.cardColors()
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                if (hasDevCreds) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (hasDevCreds) MaterialTheme.colorScheme.tertiary
+                                       else MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                if (hasDevCreds) "Developer credentials configured"
+                                else "App credentials required",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (hasDevCreds) MaterialTheme.colorScheme.tertiary
+                                        else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Text(
+                            "Register at euopen.ttlock.com (EU) or open.ttlock.com (global) to get a Client ID and Client Secret for your app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (hasDevCreds) MaterialTheme.colorScheme.onSurfaceVariant
+                                    else MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        OutlinedTextField(
+                            value = devClientId,
+                            onValueChange = { devClientId = it },
+                            label = { Text("Client ID") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = devClientSecret,
+                            onValueChange = { devClientSecret = it },
+                            label = { Text("Client Secret") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (devSecretVisible) VisualTransformation.None
+                                                   else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = {
+                                IconButton(onClick = { devSecretVisible = !devSecretVisible }) {
+                                    Icon(
+                                        if (devSecretVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = "Toggle visibility"
+                                    )
+                                }
+                            }
+                        )
+                        Button(
+                            onClick = {
+                                viewModel.saveClientCredentials(devClientId.trim(), devClientSecret.trim())
+                                hasDevCreds = viewModel.hasClientCredentials
+                                devClientId = ""
+                                devClientSecret = ""
+                            },
+                            enabled = devClientId.isNotBlank() && devClientSecret.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Save Developer Credentials") }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 // ── TTLock Account ────────────────────────────────────────────
                 SectionHeader("TTLock Account")

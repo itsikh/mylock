@@ -19,9 +19,11 @@ import java.util.concurrent.TimeUnit
  * working URL for all subsequent calls.
  */
 class TtlockClient(
-    private val clientId: String,
-    private val clientSecret: String
+    clientId: String,
+    clientSecret: String
 ) {
+    @Volatile var clientId: String = clientId
+    @Volatile var clientSecret: String = clientSecret
     private val gson = Gson()
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -79,7 +81,7 @@ class TtlockClient(
     }
 
     private fun isInvalidClient(r: TtlockTokenResponse) =
-        r.errcode != 0 && r.errmsg.contains("invalid client", ignoreCase = true)
+        r.errcode == 10001 || (r.errcode != 0 && r.errmsg.contains("invalid client", ignoreCase = true))
 
     suspend fun refreshToken(refreshToken: String): TtlockResult<TtlockTokenResponse> {
         AppLogger.i(TAG, "refreshToken() → $baseUrl")
