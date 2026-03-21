@@ -34,7 +34,7 @@ fi
 
 read_appconfig_string() {
     local key="$1"
-    grep "${key}" "$APP_CONFIG_FILE" | grep -oP '"[^"]+"' | head -1 | tr -d '"'
+    grep "${key}" "$APP_CONFIG_FILE" | grep -oE '"[^"]+"' | head -1 | tr -d '"'
 }
 
 BUGS_REPO_OWNER="$(read_appconfig_string 'GITHUB_ISSUES_REPO_OWNER')"
@@ -42,7 +42,7 @@ BUGS_REPO_NAME="$(read_appconfig_string 'GITHUB_ISSUES_REPO_NAME')"
 BUGS_REPO="${BUGS_REPO_OWNER}/${BUGS_REPO_NAME}"
 
 # Derive a short slug from build.gradle.kts applicationId for the lock file
-APP_ID="$(grep 'applicationId\s*=' "$PROJECT_DIR/app/build.gradle.kts" | grep -oP '"[^"]+"' | tr -d '"' | tr '.' '-')"
+APP_ID="$(grep 'applicationId' "$PROJECT_DIR/app/build.gradle.kts" | grep -oE '"[^"]+"' | tr -d '"' | tr '.' '-')"
 if [[ -z "$APP_ID" ]]; then
     APP_ID="android-template"
 fi
