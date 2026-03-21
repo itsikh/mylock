@@ -28,8 +28,8 @@ android {
         applicationId = "com.mylock.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.0.15"
+        versionCode = 16
+        versionName = "0.0.16"
 
         // Inject TTLock credentials as BuildConfig fields — values come from local.properties
         buildConfigField("String", "TTLOCK_CLIENT_ID",
