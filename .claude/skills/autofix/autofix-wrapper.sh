@@ -30,7 +30,7 @@ log_err()    { echo "[$(timestamp)] [wrapper] ERROR: $*" >&2; }
 mkdir -p "$LOG_DIR"
 
 # Derive lock name the same way autofix.sh does (for error messages)
-APP_ID="$(grep 'applicationId\s*=' "$PROJECT_DIR/app/build.gradle.kts" 2>/dev/null | grep -oP '"[^"]+"' | tr -d '"' | tr '.' '-' || echo "android-template")"
+APP_ID="$(grep 'applicationId\s*=' "$PROJECT_DIR/app/build.gradle.kts" 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"' | tr '.' '-' || echo "android-template")"
 LOCK_DIR="/tmp/${APP_ID}-autofix.lockdir"
 
 attempt=1
