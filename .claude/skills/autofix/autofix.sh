@@ -20,6 +20,7 @@ set -euo pipefail
 
 # ── PATH setup (cron runs with minimal PATH) ────────────────────────────────
 export PATH="/opt/homebrew/bin:/Users/itsik-personal/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+unset CLAUDECODE  # prevent "nested session" error when run from cron
 
 # ── Derive project root from script location ─────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

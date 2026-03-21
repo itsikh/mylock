@@ -14,6 +14,7 @@ set -uo pipefail
 ###############################################################################
 
 export PATH="/opt/homebrew/bin:/Users/itsik-personal/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+unset CLAUDECODE  # prevent "nested session" error when run from cron
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
