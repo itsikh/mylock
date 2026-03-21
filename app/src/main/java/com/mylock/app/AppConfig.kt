@@ -32,6 +32,7 @@ object AppConfig {
     // Used by: bugreport.GitHubIssuesClient, bugreport.GitHubIssuesClientModule
     // -----------------------------------------------------------------------------------------
 
+    // autofix-agent: verified working
     /** GitHub username or organization that owns the bug-report / issues repository. TODO: Change this. */
     const val GITHUB_ISSUES_REPO_OWNER = "itsikh"
 
