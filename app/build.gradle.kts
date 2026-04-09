@@ -128,4 +128,7 @@ dependencies {
 
     // Location / Geofencing
     implementation(libs.play.services.location)
+
+    // WorkManager
+    implementation(libs.work.runtime.ktx)
 }
